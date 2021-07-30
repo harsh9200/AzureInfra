@@ -13,7 +13,7 @@ provider "azurerm" {
 
 #? Create Resource Group
 resource "azurerm_resource_group" "resource" {
-    name     = "test_resource"
+    name     = "test_resource_2"
     location = "West Europe"
 }
 
@@ -23,6 +23,8 @@ resource "azurerm_virtual_network" "v_net" {
     resource_group_name = azurerm_resource_group.resource.name
     location            = azurerm_resource_group.resource.location
     address_space       = ["10.0.0.0/16"]
+    
+    depends_on = [ azurerm_resource_group.resource ]
 }
 
 #? Subnet 1
@@ -31,6 +33,8 @@ resource "azurerm_subnet" "subnet_1" {
     resource_group_name  = azurerm_resource_group.resource.name
     virtual_network_name = azurerm_virtual_network.v_net.name
     address_prefixes     = ["10.0.1.0/24"]
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_virtual_network.v_net ]
 }
 
 #? Subnet 2
@@ -39,6 +43,8 @@ resource "azurerm_subnet" "subnet_2" {
     resource_group_name  = azurerm_resource_group.resource.name
     virtual_network_name = azurerm_virtual_network.v_net.name
     address_prefixes     = ["10.0.2.0/24"]
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_virtual_network.v_net ]
 }
 
 #? Subnet 3
@@ -47,6 +53,8 @@ resource "azurerm_subnet" "subnet_3" {
     resource_group_name  = azurerm_resource_group.resource.name
     virtual_network_name = azurerm_virtual_network.v_net.name
     address_prefixes     = ["10.0.3.0/24"]
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_virtual_network.v_net ]
 }
 
 #? Subnet 4
@@ -55,6 +63,8 @@ resource "azurerm_subnet" "subnet_4" {
     resource_group_name  = azurerm_resource_group.resource.name
     virtual_network_name = azurerm_virtual_network.v_net.name
     address_prefixes     = ["10.0.4.0/24"]
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_virtual_network.v_net ]
 }
 
 
@@ -68,6 +78,8 @@ resource "azurerm_public_ip" "bastion_public_ip" {
     resource_group_name = azurerm_resource_group.resource.name
     location            = azurerm_resource_group.resource.location
     allocation_method   = "Static"
+    
+    depends_on = [ azurerm_resource_group.resource ]
 }
 
 #? Network Security Group
@@ -87,6 +99,8 @@ resource "azurerm_network_security_group" "test_bastion_vm_nsg" {
         source_address_prefix      = "*"
         destination_address_prefix = "*"
     }
+
+    depends_on = [ azurerm_resource_group.resource ]
 }
 
 #? Network Interface
@@ -101,12 +115,16 @@ resource "azurerm_network_interface" "test_bastion_nic" {
         private_ip_address_allocation = "Dynamic"
         public_ip_address_id          = azurerm_public_ip.bastion_public_ip.id
     }
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_subnet.subnet_2, azurerm_public_ip.bastion_public_ip ]
 }
 
 #? Network Security Group Associated with Network Interface
 resource "azurerm_network_interface_security_group_association" "test_bastion_association" {
     network_interface_id      = azurerm_network_interface.test_bastion_nic.id
     network_security_group_id = azurerm_network_security_group.test_bastion_vm_nsg.id
+
+    depends_on = [ azurerm_network_interface.test_bastion_nic, azurerm_network_security_group.test_bastion_vm_nsg ]
 }
 
 #? Virtual Machine
@@ -136,6 +154,9 @@ resource "azurerm_linux_virtual_machine" "test_bastion_vm" {
         sku       = "16.04-LTS"
         version   = "latest"
     }
+
+    depends_on = [ azurerm_network_interface.test_bastion_nic, azurerm_network_security_group.test_bastion_vm_nsg, azurerm_network_interface_security_group_association.test_bastion_association ]
+
 }
 
 
@@ -163,6 +184,8 @@ resource "azurerm_network_security_group" "app_vm_nsg" {
         source_address_prefix      = "*"
         destination_address_prefix = "*"
     }
+
+    depends_on = [ azurerm_resource_group.resource ]
 }
 
 #? Network Interface
@@ -176,12 +199,16 @@ resource "azurerm_network_interface" "app_vm_nic" {
         subnet_id                     = azurerm_subnet.subnet_3.id
         private_ip_address_allocation = "Dynamic"
     }
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_subnet.subnet_3 ]
 }
 
 #? Network Security Group Associated with Network Interface
 resource "azurerm_network_interface_security_group_association" "app_vm_association" {
     network_interface_id      = azurerm_network_interface.app_vm_nic.id
     network_security_group_id = azurerm_network_security_group.app_vm_nsg.id
+
+    depends_on = [ azurerm_network_interface.app_vm_nic, azurerm_network_security_group.app_vm_nsg ]
 }
 
 
@@ -212,6 +239,8 @@ resource "azurerm_linux_virtual_machine" "app_vm" {
         sku       = "16.04-LTS"
         version   = "latest"
     }
+
+    depends_on = [ azurerm_network_interface.app_vm_nic, azurerm_network_security_group.app_vm_nsg, azurerm_network_interface_security_group_association.app_vm_association ]
 }
 
 
@@ -229,6 +258,9 @@ resource "azurerm_public_ip" "app_gateway_public_ip" {
     resource_group_name = azurerm_resource_group.resource.name
     location            = azurerm_resource_group.resource.location
     allocation_method   = "Dynamic"
+
+    depends_on = [ azurerm_resource_group.resource ]
+
 }
 
 
@@ -286,6 +318,8 @@ resource "azurerm_application_gateway" "test_app_gateway" {
         backend_address_pool_name  = "Backend-Address-Pool"
         backend_http_settings_name = "HTTP-Setting"
     }
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_public_ip.app_gateway_public_ip, azurerm_subnet.subnet_1, azurerm_linux_virtual_machine.app_vm ]
 }
 
 
@@ -293,4 +327,6 @@ resource "azurerm_network_interface_application_gateway_backend_address_pool_ass
     ip_configuration_name   = "internal"
     network_interface_id    = azurerm_network_interface.app_vm_nic.id
     backend_address_pool_id = azurerm_application_gateway.test_app_gateway.backend_address_pool.0.id
+
+    depends_on = [ azurerm_resource_group.resource, azurerm_network_interface.app_vm_nic, azurerm_application_gateway.test_app_gateway ]
 }
